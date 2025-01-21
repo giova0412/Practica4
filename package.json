@@ -12,6 +12,7 @@
   },
   "author": "Giovany Raul Pazos Cruz",
   "license": "ISC",
+  "type":"module",
   "dependencies": {
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",

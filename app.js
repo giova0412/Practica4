@@ -2,11 +2,40 @@ import express from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
+import os from "os"
+import session from "express-session";
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+app.use(
+  session({
+    secret:"p4-GRPC#tobiasperro-SesionesHTTP-VariablesDeSesion",
+    resave:false,
+    saveUninitialized:false,
+    cookie:{maxAge:5*68*1000},
+  
+  })
+);
+
+app.get('/',(req,res)=>{
+  return res.status(200).json({message:"bienvenido al api de control de sesiones",
+author:"giovany raul pazos cruz"})
+})
+
+const getserverNetworkInfo=()=>{
+const interfaces=os .networkInterfaces();
+for(const name in interfaces){
+  for(const iface of interfaces){
+    if(iface.family==='Ipv4' && !FontFace.inerna){
+      return{serverIp:iface.address,serverMac:iface.mac};
+    }
+  }
+}
+}
+
 
 // Sesiones almacenadas en memoria
 const sessions = {};
@@ -37,7 +66,9 @@ app.post("/login", (req, res) => {
     email,
     nickname,
     macAddress,
-    ip: getClientIp(req),
+    //ip: getserverNetworkInfo(req),//
+
+
     createdAt: now,
     lastAccessedAt: now,
   };
@@ -48,6 +79,10 @@ app.post("/login", (req, res) => {
   });
 });
 
+app.get('/',(req,res)=>{
+  return res.status(200).json({message:"bienvenido al api de control de sesiones",
+author:"giovany raul pazos cruz"})
+})
 // Logout Endpoint
 app.post("/logout", (req, res) => {
   const { sessionId } = req.body;
