@@ -4,7 +4,6 @@ import mongoose from "mongoose";
 const sessionSchema = new mongoose.Schema({
     sessionId: String,
     email: String,
-    fullName: String,
     nickname: String,
     macAddress: String,
     clientIp: String,

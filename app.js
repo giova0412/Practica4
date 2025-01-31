@@ -22,7 +22,6 @@ app.use(
     })
 );
 
-// Función para obtener la IP del cliente
 const getClientIp = (req) => {
     return (
         req.headers["x-forwarded-for"] ||
@@ -32,7 +31,6 @@ const getClientIp = (req) => {
     );
 };
 
-// Función para obtener la IP y MAC del servidor
 const getServerNetworkInfo = () => {
     const interfaces = os.networkInterfaces();
     for (const name in interfaces) {
@@ -44,11 +42,10 @@ const getServerNetworkInfo = () => {
     }
 };
 
-// Endpoint para login
 app.post("/login", async (req, res) => {
-    const { email, nickname, macAddress, fullName } = req.body;
+    const { email, nickname, macAddress } = req.body;
 
-    if (!email || !nickname || !macAddress || !fullName) {
+    if (!email || !nickname || !macAddress ) {
         return res.status(400).json({ message: "Falta algún campo." });
     }
 
@@ -57,12 +54,10 @@ app.post("/login", async (req, res) => {
     const clientIp = getClientIp(req);
     const { serverIp, serverMac } = getServerNetworkInfo();
 
-    // Crear el documento de sesión en MongoDB
     try {
-        const session = new Session({
+        const session = new ControlSession({
             sessionId,
             email,
-            fullName,
             nickname,
             macAddress,
             clientIp,
@@ -74,7 +69,6 @@ app.post("/login", async (req, res) => {
             inactivityTime: 0
         });
 
-        // Guardar la sesión en la base de datos
         await session.save();
 
         res.status(200).json({
@@ -87,32 +81,37 @@ app.post("/login", async (req, res) => {
     }
 });
 
-// Logout Endpoint
-app.post("/logout", (req, res) => {
+app.post("/logout", async (req, res) => {
     const { sessionId } = req.body;
 
-    if (!sessionId || !sessions[sessionId]) {
-        return res.status(404).json({ message: "No se ha encontrado una sesión activa." });
+    if (!sessionId) {
+        return res.status(400).json({ message: "El campo sessionId es obligatorio." });
     }
 
-    const session = sessions[sessionId];
-    session.lastAccessedAt = new Date();
-    session.duration = (new Date() - new Date(session.createdAt)) / 1000; // Duración final
+    try {
+        const session = await ControlSession.findOne({ sessionId });
 
-    req.session?.destroy((err) => {
-        if (err) {
-            return res.status(500).send("Error al cerrar la sesión.");
+        if (!session) {
+            return res.status(404).json({ message: "No se ha encontrado una sesión activa." });
         }
-    });
 
-    res.status(200).json({
-        message: "Logout exitoso.",
-        session,
-    });
+        await ControlSession.deleteOne({ sessionId });
+
+        req.session?.destroy((err) => {
+            if (err) {
+                return res.status(500).send("Error al cerrar la sesión.");
+            }
+        });
+
+        res.status(200).json({
+            message: "Logout exitoso.",
+        });
+    } catch (error) {
+        console.error("Error al cerrar sesión:", error);
+        res.status(500).json({ message: "Error al cerrar sesión." });
+    }
 });
 
-// Actualización de la sesión
-// Actualización de la sesión en MongoDB
 app.put("/update", async (req, res) => {
     const { sessionId, email, nickname } = req.body;
 
@@ -121,25 +120,20 @@ app.put("/update", async (req, res) => {
     }
 
     try {
-        // Buscar la sesión en la base de datos por sessionId
         const session = await ControlSession.findOne({ sessionId });
 
         if (!session) {
             return res.status(404).json({ message: "Sesión no encontrada." });
         }
 
-        // Actualizar los campos necesarios
         if (email) session.email = email;
         if (nickname) session.nickname = nickname;
 
         const now = new Date();
-
-        // Calcular duración e inactividad
-        session.duration = (now - new Date(session.createdAt)) / 1000; // en segundos
-        session.inactivityTime = (now - new Date(session.lastAccessedAt)) / 1000; // en segundos
+        session.duration = (now - new Date(session.createdAt)) / 1000;
+        session.inactivityTime = (now - new Date(session.lastAccessedAt)) / 1000;
         session.lastAccessedAt = now;
 
-        // Guardar los cambios en la base de datos
         await session.save();
 
         res.status(200).json({
@@ -151,16 +145,15 @@ app.put("/update", async (req, res) => {
         res.status(500).json({ message: "Error al actualizar la sesión." });
     }
 });
-// Estado de la sesión
+
 app.get("/status", async (req, res) => {
     const sessionId = req.query.sessionId;
-//condicional para encontrar el ID 
+
     if (!sessionId) {
         return res.status(400).json({ message: "El campo sessionId es obligatorio." });
     }
 
     try {
-        // Buscar la sesión en la base de datos por sessionId
         const session = await ControlSession.findOne({ sessionId });
 
         if (!session) {
@@ -177,8 +170,6 @@ app.get("/status", async (req, res) => {
     }
 });
 
-
-// Ruta principal
 app.get("/", (req, res) => {
     return res.status(200).json({
         message: "bienvenido al control de sesiones.",
@@ -186,9 +177,21 @@ app.get("/", (req, res) => {
     });
 });
 
+
+app.get("/sessions", async (req, res) => {
+    try {
+        const sessions = await ControlSession.find(); // Obtiene todas las sesiones
+        res.status(200).json({ sessions });
+    } catch (error) {
+        console.error("Error al obtener las sesiones:", error);
+        res.status(500).json({ message: "Error al obtener las sesiones activas." });
+    }
+});
+
+
+
 const PORT = 3000;
 
-// Iniciar el servidor
 app.listen(PORT, () => {
     console.log(`Servidor ejecutándose en http://localhost:${PORT}`);
 });
